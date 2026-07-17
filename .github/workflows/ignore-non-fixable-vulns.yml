@@ -15,6 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SNYK_API_BASE_URL: ${{ vars.SNYK_API_BASE_URL }}
+      SNYK_REST_VERSION: ${{ vars.SNYK_REST_VERSION }}
+      SNYK_ORG_ID: ${{ vars.SNYK_ORG_ID }}
+      SNYK_ORG_IDS: ${{ vars.SNYK_ORG_IDS }}
+      SNYK_GROUP_ID: ${{ vars.SNYK_GROUP_ID }}
+      SNYK_GROUP_IDS: ${{ vars.SNYK_GROUP_IDS }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,20 +39,35 @@ jobs:
           name: snyk-ignore-progress
         continue-on-error: true
 
-      - name: Ignore non-fixable vulnerabilities
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          SNYK_GROUP_ID: ${{ vars.SNYK_GROUP_ID }}
-          # Uncomment for non-US tenants:
-          # SNYK_API_BASE_URL: https://api.eu.snyk.io
+      # Org scope (default). Comment out this step if using the group step below.
+      - name: Ignore non-fixable vulnerabilities (org)
         run: |
           set -euo pipefail
           STATE_CSV="ignore_non_fixable_progress.csv"
           if [ -f "$STATE_CSV" ]; then
             python ignore_non_fixable_vulns.py --resume -s "$STATE_CSV"
           else
-            python ignore_non_fixable_vulns.py --group-id "$SNYK_GROUP_ID" -s "$STATE_CSV"
+            ARGS=(-s "$STATE_CSV")
+            if [ -n "${SNYK_ORG_ID:-}" ]; then
+              ARGS+=(--org-id "$SNYK_ORG_ID")
+            fi
+            python ignore_non_fixable_vulns.py "${ARGS[@]}"
           fi
+
+      # Group scope. Uncomment this step and comment out the org step above if needed.
+      # - name: Ignore non-fixable vulnerabilities (group)
+      #   run: |
+      #     set -euo pipefail
+      #     STATE_CSV="ignore_non_fixable_progress.csv"
+      #     if [ -f "$STATE_CSV" ]; then
+      #       python ignore_non_fixable_vulns.py --resume -s "$STATE_CSV"
+      #     else
+      #       ARGS=(-s "$STATE_CSV")
+      #       if [ -n "${SNYK_GROUP_ID:-}" ]; then
+      #         ARGS+=(--group-id "$SNYK_GROUP_ID")
+      #       fi
+      #       python ignore_non_fixable_vulns.py "${ARGS[@]}"
+      #     fi
 
       - name: Save progress CSV
         uses: actions/upload-artifact@v4

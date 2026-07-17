@@ -105,23 +105,32 @@ python ignore_non_fixable_vulns.py --org-id "<ORG_UUID>" --reason "No fix availa
 
 ## GitHub Actions
 
-A sample scheduled workflow lives at [`.github/workflows/ignore-non-fixable-vulns.yml`](.github/workflows/ignore-non-fixable-vulns.yml). It runs daily (and on manual dispatch), discovers non-fixable issues across a Snyk Group, creates ignores, and persists progress between runs via a workflow artifact.
+A sample scheduled workflow lives at [`.github/workflows/ignore-non-fixable-vulns.yml`](.github/workflows/ignore-non-fixable-vulns.yml). It runs on manual dispatch (optional schedule), discovers non-fixable issues, creates ignores, and persists progress between runs via a workflow artifact.
+
+The workflow defines two run steps — **org** (enabled by default) and **group** (commented out). Comment out the step you do not need; only one should be active.
 
 ### Repository configuration
+
+Set repository **secrets** and **variables** as needed. Unset variables are passed through as empty and ignored by the script.
 
 | Name | Type | Required | Purpose |
 |------|------|----------|---------|
 | `SNYK_TOKEN` | Secret | Yes | Snyk API token with access to the group/orgs/projects |
-| `SNYK_GROUP_ID` | Variable | Yes* | Group UUID to scan (see org alternative below) |
+| `SNYK_ORG_ID` | Variable | Yes* | Organization UUID (org step; also merged from env by the script) |
+| `SNYK_ORG_IDS` | Variable | No | Comma-separated org UUIDs |
+| `SNYK_GROUP_ID` | Variable | Yes† | Group UUID (group step; also merged from env by the script) |
+| `SNYK_GROUP_IDS` | Variable | No | Comma-separated group UUIDs |
+| `SNYK_API_BASE_URL` | Variable | No | API host (e.g. `https://api.eu.snyk.io`); default US |
+| `SNYK_REST_VERSION` | Variable | No | REST version query param; default `2024-10-15` |
 
-\* Use **`SNYK_ORG_ID`** instead if you prefer org scope. Edit the workflow step to pass `--org-id "$SNYK_ORG_ID"` rather than `--group-id`.
+\* Required when using the **org** step (default).
 
-For EU tenants, uncomment `SNYK_API_BASE_URL` in the workflow (see [Setup](#setup)).
+† Required when using the **group** step (comment in org step, uncomment group step).
 
 ### How the workflow runs
 
 1. **Restore** the previous run's `ignore_non_fixable_progress.csv` artifact (if any).
-2. **Resume** if the CSV exists (`--resume`); otherwise **discover** all orgs/projects in the group and queue new `PENDING` rows.
+2. **Resume** if the CSV exists (`--resume`); otherwise **discover** using the active step (org or group). Additional org/group IDs from `SNYK_ORG_IDS` / `SNYK_GROUP_IDS` are read from the environment automatically.
 3. **Create ignores** for each `PENDING` row (same as a local run without `--dry-run`).
 4. **Upload** the updated CSV as artifact `snyk-ignore-progress` (90-day retention) so the next run can continue where it left off.
 
@@ -129,18 +138,17 @@ The CSV is gitignored locally and in CI; only the artifact carries state across 
 
 ### Triggers and safety
 
-- **Schedule:** daily at 07:00 UTC (`cron: "0 7 * * *"`) — adjust in the workflow file as needed.
+- **Schedule:** uncomment `cron: "0 7 * * *"` in the workflow for daily 07:00 UTC (adjust as needed).
 - **Manual:** **Actions → Snyk ignore non-fixable vulns → Run workflow**.
 - **Concurrency:** one run at a time (`cancel-in-progress: false`) so two jobs do not write the same CSV artifact concurrently.
-- **Timeout:** 360 minutes; increase for very large groups or narrow scope with `--org-id` / `--project-id` in the workflow.
+- **Timeout:** 360 minutes; increase for very large groups or narrow scope with `--project-id` in the workflow.
 
 ### Customizing the workflow
 
 Common edits:
 
-- **Org instead of group** — set `SNYK_ORG_ID` and replace `--group-id` with `--org-id` in the run step.
-- **Dry-run gate** — add `--dry-run` to validate discovery before enabling live ignores.
-- **Multiple groups/orgs** — use comma-separated `SNYK_GROUP_IDS` / `SNYK_ORG_IDS` env vars (the script merges them with CLI flags).
+- **Group instead of org** — comment out the org step, uncomment the group step, set `SNYK_GROUP_ID` (and optionally `SNYK_GROUP_IDS`).
+- **Dry-run gate** — add `--dry-run` to the `python` command to validate discovery before enabling live ignores.
 - **Fresh discovery** — delete the `snyk-ignore-progress` artifact in the Actions UI to force a full re-scan.
 
 ## Notes
