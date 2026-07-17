@@ -1,7 +1,7 @@
 name: Snyk ignore non-fixable vulns
 
 on:
-  schedule:
+  # schedule:
     # Daily at 07:00 UTC (uncomment and adjust as needed).
     # - cron: "0 7 * * *"
   workflow_dispatch:
