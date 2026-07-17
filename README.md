@@ -111,7 +111,7 @@ The workflow defines two run steps — **org** (enabled by default) and **group*
 
 ### Repository configuration
 
-Set repository **secrets** and **variables** as needed. Unset variables are passed through as empty and ignored by the script.
+Set repository **secrets** and **variables** as needed. Unset or empty repository variables are ignored; the script uses its built-in defaults (GitHub Actions passes unset vars as empty strings).
 
 | Name | Type | Required | Purpose |
 |------|------|----------|---------|
